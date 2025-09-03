@@ -176,7 +176,7 @@ flowchart TD
         N --> O[Find Registered Handlers]
         O --> P[Create Service Scope]
         P --> Q[Resolve Handler from DI]
-        Q --> R[Invoke Handler.HandleAsync()]
+        Q --> R[Invoke Handler HandleAsync]
         R --> S[Complete Processing]
     end
     
@@ -203,7 +203,7 @@ graph TD
         
         K[Event Handling] --> L[Create Service Scope]
         L --> M[Resolve Handler Type]
-        M --> N[Invoke Handler.HandleAsync]
+        M --> N[Invoke Handler HandleAsync]
     end
     
     E --> I
