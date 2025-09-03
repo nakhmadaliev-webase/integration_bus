@@ -130,5 +130,22 @@ dotnet run
 ✅ Easy dependency injection integration
 ✅ Complete documentation and examples
 
+### Build Issues Fixed
+- ✅ Updated System.Text.Json from 8.0.4 to 8.0.5 (security vulnerability)
+- ✅ Added missing `OnEventRemoved` event to subscription manager interface
+- ✅ Fixed RabbitMQ event bus method signatures and async patterns
+- ✅ Implemented proper disposal pattern for RabbitMQ connections
+- ✅ Resolved all compilation errors and warnings
+
+### Architecture Documentation Created
+- Complete mermaid flow diagrams covering:
+  - Overall system architecture with microservice interactions
+  - Event publishing and subscription flows
+  - Class hierarchy and dependency relationships
+  - Error handling and resilience patterns
+  - Saga pattern implementation for complex workflows
+  - Performance and scalability considerations
+  - Development vs production environment flows
+
 ### Generated with Claude Code
 This integration bus provides a solid foundation for event-driven microservice architecture in ASP.NET Core applications.

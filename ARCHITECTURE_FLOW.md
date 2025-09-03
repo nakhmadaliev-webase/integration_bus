@@ -107,39 +107,39 @@ classDiagram
         +DateTime OrderDate
     }
     
-    class IIntegrationEventHandler~T~ {
+    class IIntegrationEventHandlerT {
         <<interface>>
         +HandleAsync(T event, CancellationToken token) Task
     }
     
     class IEventBus {
         <<interface>>
-        +PublishAsync~T~(T event, CancellationToken token) Task
-        +Subscribe~T,TH~() void
-        +Unsubscribe~T,TH~() void
+        +PublishAsync(T event, CancellationToken token) Task
+        +Subscribe() void
+        +Unsubscribe() void
     }
     
     class InMemoryEventBus {
         -IServiceProvider _serviceProvider
         -IEventBusSubscriptionsManager _subscriptionsManager
-        +PublishAsync~T~(T event, CancellationToken token) Task
-        +Subscribe~T,TH~() void
+        +PublishAsync(T event, CancellationToken token) Task
+        +Subscribe() void
     }
     
     class RabbitMQEventBus {
         -IConnection _connection
         -IModel _consumerChannel
         -RabbitMQEventBusOptions _options
-        +PublishAsync~T~(T event, CancellationToken token) Task
-        +Subscribe~T,TH~() void
+        +PublishAsync(T event, CancellationToken token) Task
+        +Subscribe() void
     }
     
     class IEventBusSubscriptionsManager {
         <<interface>>
         +bool IsEmpty
-        +event EventHandler~string~ OnEventRemoved
-        +AddSubscription~T,TH~() void
-        +GetHandlersForEvent(string eventName) IEnumerable~SubscriptionInfo~
+        +event EventHandler OnEventRemoved
+        +AddSubscription() void
+        +GetHandlersForEvent(string eventName) IEnumerable
     }
     
     IIntegrationEvent <|-- IntegrationEvent
@@ -160,9 +160,9 @@ flowchart TD
     D --> E[Subscribe to Events]
     
     E --> F{Event Subscription}
-    F --> G[eventBus.Subscribe<OrderCreatedEvent, OrderCreatedEventHandler>()]
-    F --> H[eventBus.Subscribe<PaymentProcessedEvent, PaymentProcessedEventHandler>()]
-    F --> I[eventBus.Subscribe<InventoryUpdatedEvent, InventoryUpdatedEventHandler>()]
+    F --> G["eventBus.Subscribe OrderCreatedEvent"]
+    F --> H["eventBus.Subscribe PaymentProcessedEvent"]
+    F --> I["eventBus.Subscribe InventoryUpdatedEvent"]
     
     G --> J[Add to SubscriptionsManager]
     H --> J
