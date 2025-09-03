@@ -8,6 +8,8 @@ public class InMemoryEventBusSubscriptionsManager : IEventBusSubscriptionsManage
     private readonly List<Type> _eventTypes;
 
     public bool IsEmpty => _handlers.Keys.Count == 0;
+    
+    public event EventHandler<string>? OnEventRemoved;
 
     public InMemoryEventBusSubscriptionsManager()
     {
@@ -111,6 +113,7 @@ public class InMemoryEventBusSubscriptionsManager : IEventBusSubscriptionsManage
                 {
                     _eventTypes.Remove(eventType);
                 }
+                OnEventRemoved?.Invoke(this, eventName);
             }
         }
     }

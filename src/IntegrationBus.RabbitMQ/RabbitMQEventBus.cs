@@ -43,7 +43,7 @@ public class RabbitMQEventBus : IEventBus, IDisposable
         _subscriptionsManager.OnEventRemoved += SubscriptionsManager_OnEventRemoved!;
     }
 
-    public async Task PublishAsync<TIntegrationEvent>(TIntegrationEvent integrationEvent, CancellationToken cancellationToken = default)
+    public Task PublishAsync<TIntegrationEvent>(TIntegrationEvent integrationEvent, CancellationToken cancellationToken = default)
         where TIntegrationEvent : IIntegrationEvent
     {
         if (!IsConnected)
@@ -73,7 +73,7 @@ public class RabbitMQEventBus : IEventBus, IDisposable
             WriteIndented = true
         });
 
-        await policy.ExecuteAsync(async () =>
+        return policy.ExecuteAsync(() =>
         {
             var properties = channel.CreateBasicProperties();
             properties.DeliveryMode = 2; // persistent
@@ -86,6 +86,8 @@ public class RabbitMQEventBus : IEventBus, IDisposable
                 mandatory: true,
                 basicProperties: properties,
                 body: body);
+                
+            return Task.CompletedTask;
         });
     }
 
@@ -96,7 +98,7 @@ public class RabbitMQEventBus : IEventBus, IDisposable
         var eventName = _subscriptionsManager.GetEventKey<TIntegrationEvent>();
         DoInternalSubscription(eventName);
 
-        _logger.LogInformation("Subscribing to event {EventName} with {EventHandler}", eventName, typeof(TIntegrationEventHandler).GetGenericTypeName());
+        _logger.LogInformation("Subscribing to event {EventName} with {EventHandler}", eventName, typeof(TIntegrationEventHandler).Name);
 
         _subscriptionsManager.AddSubscription<TIntegrationEvent, TIntegrationEventHandler>();
         StartBasicConsume();
@@ -150,9 +152,18 @@ public class RabbitMQEventBus : IEventBus, IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        
+        _disposed = true;
+        
         if (_consumerChannel != null)
         {
             _consumerChannel.Dispose();
+        }
+        
+        if (_connection != null)
+        {
+            _connection.Dispose();
         }
 
         _subscriptionsManager.Clear();
@@ -279,7 +290,7 @@ public class RabbitMQEventBus : IEventBus, IDisposable
     private bool IsConnected =>
         _connection != null && _connection.IsOpen && !_disposed;
 
-    private bool _disposed;
+    private bool _disposed = false;
 
     private void TryConnect()
     {
