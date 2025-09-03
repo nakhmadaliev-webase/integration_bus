@@ -1,88 +1,143 @@
 # Integration Bus Architecture Flow
 
-## Overall System Architecture
+## Overall System Architecture with External Integration
 
 ```mermaid
 graph TB
-    subgraph "Microservice A (Order Service)"
-        A1[Order Controller]
-        A2[Order Service]
-        A3[Order Repository]
-        A4[OrderCreatedEventHandler]
-        A5[IEventBus]
+    subgraph "Internal Microservices"
+        subgraph "Order Service"
+            A1[Order Controller]
+            A2[Order Service]
+            A3[Order Repository]
+            A4[OrderCreatedEventHandler]
+            A5[Internal EventBus]
+        end
+        
+        subgraph "Payment Service"
+            B1[Payment Controller]
+            B2[Payment Service]
+            B3[Payment Repository]
+            B4[PaymentProcessedEventHandler]
+            B5[Internal EventBus]
+        end
+        
+        subgraph "Notification Service"
+            C1[Notification Controller]
+            C2[Notification Service]
+            C3[Notification Repository]
+            C4[NotificationEventHandler]
+            C5[Internal EventBus]
+        end
     end
     
-    subgraph "Microservice B (Payment Service)"
-        B1[Payment Controller]
-        B2[Payment Service]
-        B3[Payment Repository]
-        B4[PaymentProcessedEventHandler]
-        B5[IEventBus]
+    subgraph "Integration Layer"
+        subgraph "Internal Message Broker"
+            IMB[(RabbitMQ / In-Memory)]
+        end
+        
+        subgraph "External Integration Bus"
+            EEB[External EventBus]
+            WHR[Webhook Receiver]
+            PGA[Payment Gateway Adapter]
+            NSA[Notification Service Adapter]
+        end
     end
     
-    subgraph "Microservice C (Inventory Service)"
-        C1[Inventory Controller]
-        C2[Inventory Service]
-        C3[Inventory Repository]
-        C4[InventoryUpdatedEventHandler]
-        C5[IEventBus]
+    subgraph "External Systems"
+        subgraph "Payment Gateway"
+            PG[Payment API]
+            PGWH[Payment Webhooks]
+        end
+        
+        subgraph "Email Service"
+            ES[Email API]
+            ESWH[Email Webhooks]
+        end
+        
+        subgraph "SMS Provider"
+            SMS[SMS API]
+            SMSWH[SMS Webhooks]
+        end
     end
     
-    subgraph "Message Broker"
-        MB[(RabbitMQ / In-Memory)]
-    end
-    
+    %% Internal service connections
     A1 --> A2
     A2 --> A3
     A2 --> A5
-    A5 --> MB
-    MB --> B4
-    MB --> C4
+    A5 --> IMB
+    IMB --> B4
+    IMB --> C4
     
     B1 --> B2
     B2 --> B3
     B2 --> B5
-    B5 --> MB
-    MB --> A4
+    B5 --> IMB
+    IMB --> A4
     
     C1 --> C2
     C2 --> C3
     C2 --> C5
-    C5 --> MB
-    MB --> A4
-    MB --> B4
+    C5 --> IMB
+    
+    %% External integration connections
+    A5 --> EEB
+    B5 --> EEB
+    C5 --> EEB
+    
+    EEB --> PGA
+    EEB --> NSA
+    
+    PGA --> PG
+    NSA --> ES
+    NSA --> SMS
+    
+    %% Webhook connections
+    PGWH --> WHR
+    ESWH --> WHR
+    SMSWH --> WHR
+    WHR --> IMB
 ```
 
-## Event Publishing Flow
+## Event Publishing Flow with External Integration
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant OrderController
     participant OrderService
-    participant EventBus
+    participant InternalEventBus
     participant MessageBroker
-    participant PaymentHandler
-    participant InventoryHandler
+    participant ExternalEventBus
+    participant PaymentAdapter
+    participant PaymentGateway
+    participant WebhookReceiver
     
     Client->>OrderController: POST /api/orders
     OrderController->>OrderService: CreateOrder(request)
     OrderService->>OrderService: Create Order Entity
     OrderService->>OrderService: Save to Database
     
-    OrderService->>EventBus: PublishAsync(OrderCreatedEvent)
-    EventBus->>MessageBroker: Serialize & Send Message
+    OrderService->>InternalEventBus: PublishAsync(OrderCreatedEvent)
+    InternalEventBus->>MessageBroker: Serialize & Send Message
     
     OrderController-->>Client: 201 Created (Order Response)
     
-    MessageBroker->>PaymentHandler: OrderCreatedEvent
-    PaymentHandler->>PaymentHandler: Process Payment Logic
+    MessageBroker->>ExternalEventBus: OrderCreatedEvent
+    ExternalEventBus->>PaymentAdapter: Process Payment Request
+    PaymentAdapter->>PaymentGateway: HTTP POST /api/payments/process
     
-    MessageBroker->>InventoryHandler: OrderCreatedEvent
-    InventoryHandler->>InventoryHandler: Update Inventory Logic
+    Note over PaymentGateway: External payment processing
+    
+    PaymentGateway-->>PaymentAdapter: Payment Response
+    PaymentAdapter-->>ExternalEventBus: Success/Failure
+    
+    PaymentGateway->>WebhookReceiver: Webhook: PaymentCompletedEvent
+    WebhookReceiver->>WebhookReceiver: Validate Signature
+    WebhookReceiver->>InternalEventBus: PublishAsync(PaymentCompletedEvent)
+    InternalEventBus->>MessageBroker: Internal Event Distribution
 ```
 
-## Class Hierarchy & Dependencies
+## Class Hierarchy & Dependencies with External Integration
 
 ```mermaid
 classDiagram
@@ -100,6 +155,20 @@ classDiagram
         +string EventType
     }
     
+    class IExternalIntegrationEvent {
+        <<interface>>
+        +string ExternalSystemId
+        +string ExternalEventId
+        +Dictionary Metadata
+    }
+    
+    class ExternalIntegrationEvent {
+        <<abstract>>
+        +string ExternalSystemId
+        +string ExternalEventId
+        +Dictionary Metadata
+    }
+    
     class OrderCreatedEvent {
         +int OrderId
         +string CustomerName
@@ -107,47 +176,71 @@ classDiagram
         +DateTime OrderDate
     }
     
-    class IIntegrationEventHandlerT {
-        <<interface>>
-        +HandleAsync(T event, CancellationToken token) Task
+    class PaymentCompletedEvent {
+        +string TransactionId
+        +int OrderId
+        +decimal Amount
+        +DateTime CompletedAt
     }
     
     class IEventBus {
         <<interface>>
-        +PublishAsync(T event, CancellationToken token) Task
-        +Subscribe() void
-        +Unsubscribe() void
-    }
-    
-    class InMemoryEventBus {
-        -IServiceProvider _serviceProvider
-        -IEventBusSubscriptionsManager _subscriptionsManager
-        +PublishAsync(T event, CancellationToken token) Task
+        +PublishAsync() Task
         +Subscribe() void
     }
     
-    class RabbitMQEventBus {
-        -IConnection _connection
-        -IModel _consumerChannel
-        -RabbitMQEventBusOptions _options
-        +PublishAsync(T event, CancellationToken token) Task
-        +Subscribe() void
-    }
-    
-    class IEventBusSubscriptionsManager {
+    class IExternalEventBus {
         <<interface>>
-        +bool IsEmpty
-        +event EventHandler OnEventRemoved
-        +AddSubscription() void
-        +GetHandlersForEvent(string eventName) IEnumerable
+        +PublishToExternalSystemAsync() Task
+        +RequestFromExternalSystemAsync() Task
+        +RegisterExternalSystem() void
+    }
+    
+    class IExternalSystemClient {
+        <<interface>>
+        +string SystemId
+        +SendAsync() Task
+        +HealthCheckAsync() Task
+    }
+    
+    class HttpExternalSystemClient {
+        -HttpClient _httpClient
+        -ExternalSystemOptions _options
+        +SendAsync() Task
+        +GetAsync() Task
+        +HealthCheckAsync() Task
+    }
+    
+    class ResilientHttpExternalSystemClient {
+        -HttpExternalSystemClient _innerClient
+        -ResiliencePolicy _resiliencePolicy
+        -CircuitBreakerPolicy _circuitBreakerPolicy
+        +SendAsync() Task
+    }
+    
+    class PaymentGatewayAdapter {
+        -IExternalEventBus _externalEventBus
+        +ProcessPaymentAsync() Task
+        +RefundPaymentAsync() Task
+        +GetPaymentStatusAsync() Task
+    }
+    
+    class IWebhookReceiver {
+        <<interface>>
+        +ValidateWebhookAsync() Task
+        +ProcessWebhookAsync() Task
     }
     
     IIntegrationEvent <|-- IntegrationEvent
+    IIntegrationEvent <|-- IExternalIntegrationEvent
+    IntegrationEvent <|-- ExternalIntegrationEvent
     IntegrationEvent <|-- OrderCreatedEvent
-    IEventBus <|-- InMemoryEventBus
-    IEventBus <|-- RabbitMQEventBus
-    InMemoryEventBus --> IEventBusSubscriptionsManager
-    RabbitMQEventBus --> IEventBusSubscriptionsManager
+    ExternalIntegrationEvent <|-- PaymentCompletedEvent
+    IExternalSystemClient <|-- HttpExternalSystemClient
+    IExternalSystemClient <|-- ResilientHttpExternalSystemClient
+    HttpExternalSystemClient <|-- ResilientHttpExternalSystemClient
+    PaymentGatewayAdapter --> IExternalEventBus
+    IExternalEventBus --> IExternalSystemClient
 ```
 
 ## Event Subscription & Handling Flow
@@ -210,39 +303,70 @@ graph TD
     G --> M
 ```
 
-## Message Flow Architecture
+## Message Flow Architecture with External Integration
 
 ```mermaid
 flowchart LR
-    subgraph "Publisher Microservice"
-        P1[Controller] --> P2[Business Logic]
-        P2 --> P3[Domain Event]
-        P3 --> P4[Event Bus]
+    subgraph "Internal Microservices"
+        subgraph "Publisher Microservice"
+            P1[Controller] --> P2[Business Logic]
+            P2 --> P3[Domain Event]
+            P3 --> P4[Internal Event Bus]
+        end
+        
+        subgraph "Subscriber Microservice"
+            C1[Event Handler] --> C2[Business Logic]
+            C2 --> C3[Database Update]
+        end
     end
     
-    subgraph "Message Infrastructure"
-        MB1[(Message Broker)]
-        Q1[Queue/Exchange]
-        S1[Serialization]
-        S2[Deserialization]
+    subgraph "Integration Layer"
+        subgraph "Message Infrastructure"
+            MB1[(Internal Message Broker)]
+            Q1[Queue/Exchange]
+            S1[Serialization]
+            S2[Deserialization]
+        end
+        
+        subgraph "External Integration"
+            EEB[External Event Bus]
+            PGA[Payment Adapter]
+            NSA[Notification Adapter]
+            WHR[Webhook Receiver]
+        end
     end
     
-    subgraph "Subscriber Microservice 1"
-        C1[Event Handler] --> C2[Business Logic]
-        C2 --> C3[Database Update]
+    subgraph "External Systems"
+        subgraph "Payment Gateway"
+            PG[Payment API]
+            PGWH[Payment Webhooks]
+        end
+        
+        subgraph "Notification Service"
+            NS[Email/SMS API]
+            NSWH[Delivery Webhooks]
+        end
     end
     
-    subgraph "Subscriber Microservice 2"
-        D1[Event Handler] --> D2[Business Logic]
-        D2 --> D3[External API Call]
-    end
-    
+    %% Internal flow
     P4 --> S1
     S1 --> MB1
     MB1 --> Q1
     Q1 --> S2
     S2 --> C1
-    S2 --> D1
+    
+    %% External integration flow
+    P4 --> EEB
+    EEB --> PGA
+    EEB --> NSA
+    
+    PGA --> PG
+    NSA --> NS
+    
+    %% Webhook flow
+    PGWH --> WHR
+    NSWH --> WHR
+    WHR --> MB1
 ```
 
 ## Error Handling & Resilience Flow
@@ -349,7 +473,7 @@ graph TD
     MB3 --> C3
 ```
 
-## Development vs Production Flow
+## Development vs Production Flow with External Integration
 
 ```mermaid
 graph TB
@@ -358,6 +482,8 @@ graph TB
         DEV2[Single Process]
         DEV3[Immediate Delivery]
         DEV4[Console Logging]
+        DEV5[Mock External Systems]
+        DEV6[Test Webhooks]
     end
     
     subgraph "Production Environment"
@@ -368,20 +494,33 @@ graph TB
         PROD5[Monitoring & Metrics]
         PROD6[Circuit Breakers]
         PROD7[Dead Letter Queues]
+        PROD8[Real External APIs]
+        PROD9[Webhook Security]
+        PROD10[Retry Policies]
+    end
+    
+    subgraph "External Integration"
+        EXT1[HTTP Clients]
+        EXT2[Webhook Receivers]
+        EXT3[System Adapters]
     end
     
     subgraph "Configuration"
         CONFIG[appsettings.json]
         ENV[Environment Variables]
+        SECRETS[Azure Key Vault / Secrets]
     end
     
     CONFIG --> DEV1
     CONFIG --> PROD1
     ENV --> PROD1
+    SECRETS --> PROD8
     
     DEV1 --> DEV2
     DEV2 --> DEV3
     DEV3 --> DEV4
+    DEV4 --> DEV5
+    DEV5 --> DEV6
     
     PROD1 --> PROD2
     PROD2 --> PROD3
@@ -389,4 +528,91 @@ graph TB
     PROD4 --> PROD5
     PROD5 --> PROD6
     PROD6 --> PROD7
+    PROD7 --> PROD8
+    PROD8 --> PROD9
+    PROD9 --> PROD10
+    
+    EXT1 --> DEV5
+    EXT1 --> PROD8
+    EXT2 --> DEV6
+    EXT2 --> PROD9
+    EXT3 --> DEV5
+    EXT3 --> PROD8
+```
+
+## External System Integration Flow with Resilience
+
+```mermaid
+graph TD
+    subgraph "Internal Services"
+        IS[Internal Service]
+        IEB[Internal Event Bus]
+        IH[Internal Event Handler]
+    end
+    
+    subgraph "External Integration Layer"
+        EEB[External Event Bus]
+        PGA[Payment Gateway Adapter]
+        NSA[Notification Service Adapter]
+        WHR[Webhook Receiver]
+        
+        subgraph "Resilience Policies"
+            CB[Circuit Breaker]
+            RP[Retry Policy]
+            TO[Timeout Policy]
+        end
+        
+        subgraph "HTTP Clients"
+            HTTP1[HTTP Client - Payment]
+            HTTP2[HTTP Client - Notification]
+        end
+    end
+    
+    subgraph "External Systems"
+        subgraph "Payment Gateway"
+            PGS[Payment API]
+            PGWH[Payment Webhooks]
+        end
+        
+        subgraph "Notification Services"
+            ESS[Email Service API]
+            ESWH[Email Webhooks]
+            SMS[SMS Service API]
+            SMSWH[SMS Webhooks]
+        end
+    end
+    
+    %% Internal to External flow
+    IS --> IEB
+    IEB --> EEB
+    EEB --> PGA
+    EEB --> NSA
+    
+    %% Payment flow with resilience
+    PGA --> CB
+    CB --> RP
+    RP --> TO
+    TO --> HTTP1
+    HTTP1 --> PGS
+    
+    %% Notification flow
+    NSA --> HTTP2
+    HTTP2 --> ESS
+    HTTP2 --> SMS
+    
+    %% Webhook return flow
+    PGWH --> WHR
+    ESWH --> WHR
+    SMSWH --> WHR
+    WHR --> IEB
+    IEB --> IH
+    
+    %% Error handling
+    CB -.-> EEB
+    RP -.-> EEB
+    
+    style CB fill:#ff9999
+    style RP fill:#ffcc99
+    style TO fill:#99ccff
+    style WHR fill:#99ff99
 ```

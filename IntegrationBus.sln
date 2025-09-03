@@ -10,6 +10,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IntegrationBus.RabbitMQ", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IntegrationBus.Examples", "examples\IntegrationBus.Examples\IntegrationBus.Examples.csproj", "{C946BE89-0A53-4ACF-B57D-A9F00D9F7048}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IntegrationBus.External", "src\IntegrationBus.External\IntegrationBus.External.csproj", "{ED60CCAB-5A02-48F0-8F45-3D1729E0225E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IntegrationBus.External.Examples", "examples\IntegrationBus.External.Examples\IntegrationBus.External.Examples.csproj", "{69977282-B503-4288-8801-52028FAE3923}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,6 +36,14 @@ Global
 		{C946BE89-0A53-4ACF-B57D-A9F00D9F7048}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C946BE89-0A53-4ACF-B57D-A9F00D9F7048}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C946BE89-0A53-4ACF-B57D-A9F00D9F7048}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ED60CCAB-5A02-48F0-8F45-3D1729E0225E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED60CCAB-5A02-48F0-8F45-3D1729E0225E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED60CCAB-5A02-48F0-8F45-3D1729E0225E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED60CCAB-5A02-48F0-8F45-3D1729E0225E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{69977282-B503-4288-8801-52028FAE3923}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{69977282-B503-4288-8801-52028FAE3923}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{69977282-B503-4288-8801-52028FAE3923}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{69977282-B503-4288-8801-52028FAE3923}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
